@@ -1,0 +1,121 @@
+name: telegram-okx-live
+
+x-live-image: &live-image
+  image: telegram-okx-live-observer:local
+  build:
+    context: .
+    dockerfile: Dockerfile.live
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+
+services:
+  postgres-live:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: okx_live
+      POSTGRES_USER: okx_live
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - postgres-live-data:/var/lib/postgresql/data
+    networks: [live-backend]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U okx_live -d okx_live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  live-observer:
+    <<: *live-image
+    container_name: telegram-okx-live-observer
+    restart: unless-stopped
+    environment:
+      LIVE_TRADING_ENABLED: "false"
+    command: [serve]
+    depends_on:
+      postgres-live: {condition: service_healthy}
+    ports: ["127.0.0.1:8011:8000"]
+    secrets: [okx_live_env, telegram_live_env, postgres_password]
+    volumes:
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/live/data
+        target: /app/live-data
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/live/logs
+        target: /app/live-logs
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/live/identity
+        target: /app/live-identity
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [live-backend, live-egress]
+    stop_grace_period: 45s
+
+  live-migrate:
+    <<: *live-image
+    profiles: [maintenance]
+    restart: "no"
+    command: [migrate]
+    healthcheck: {disable: true}
+    secrets: [postgres_password]
+    depends_on:
+      postgres-live: {condition: service_healthy}
+    networks: [live-backend]
+
+  live-identity:
+    <<: *live-image
+    profiles: [tools]
+    restart: "no"
+    command: [identity-help]
+    healthcheck: {disable: true}
+    secrets: [okx_live_env]
+    volumes:
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/live/identity
+        target: /app/live-identity
+        bind: {create_host_path: false}
+    networks: [live-egress]
+
+  live-session:
+    <<: *live-image
+    profiles: [tools]
+    restart: "no"
+    entrypoint: [python, scripts/create_live_session.py]
+    command: [--help]
+    healthcheck: {disable: true}
+    secrets: [telegram_live_env]
+    volumes:
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/live/data
+        target: /app/live-data
+        bind: {create_host_path: false}
+    networks: [live-egress]
+
+secrets:
+  okx_live_env:
+    file: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/secrets/live.env
+  telegram_live_env:
+    file: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/secrets/telegram-live.env
+  postgres_password:
+    file: ${LOCALAPPDATA:?LOCALAPPDATA is required}/OKXTrading/secrets/postgres-live-password.txt
+
+volumes:
+  postgres-live-data:
+    name: telegram-okx-live-postgres-data
+
+networks:
+  live-backend: {internal: true}
+  live-egress: {}

@@ -1,0 +1,55 @@
+name: telegram-okx-demo
+services:
+  trading-bot:
+    build: .
+    init: true
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://okx:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/okx
+      TELEGRAM_SESSION_FILE: /app/data/telegram.session-string
+      OKX_DEMO: "1"
+      LIVE_TRADING_ENABLED: "false"
+    ports:
+      - "127.0.0.1:8010:8000"
+    volumes:
+      - telegram-session:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: okx
+      POSTGRES_USER: okx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U okx -d okx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  telegram-session:
+  postgres-data:
+

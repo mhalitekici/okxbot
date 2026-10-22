@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "telegram-okx-demo"
+version = "0.1.0"
+description = "Auditable, demo-only Telegram to OKX USDT perpetual trading service"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.16,<2", "asyncpg>=0.30,<1", "fastapi>=0.115,<1",
+  "httpx>=0.28,<1", "pydantic-settings>=2.9,<3", "sqlalchemy[asyncio]>=2.0.40,<3",
+  "telethon>=1.40,<2", "uvicorn[standard]>=0.34,<1",
+  "tzdata>=2025.2",
+  "python-dotenv>=1.1,<2",
+]
+
+[project.optional-dependencies]
+dev = ["aiosqlite>=0.21,<1", "pytest>=8.3,<10", "pytest-asyncio>=1,<2", "ruff>=0.11,<1"]
+
+[project.scripts]
+telegram-session = "okx_bot.telegram.session:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/okx_bot"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["postgres: isolated PostgreSQL migration/locking and persistence tests"]
+addopts = "-m 'not postgres'"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+

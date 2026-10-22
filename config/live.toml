@@ -1,0 +1,16 @@
+# Public configuration only. All credential files are external read-only mounts.
+mode = "live-observer"
+paused = true
+live_trading_enabled = false
+subaccount = "TelegramBot1"
+telegram_channel_id = -1003769687656
+telegram_topic_id = 23576
+mztradingbot_channel_id = -1003769687656
+allocation_slots = 3
+leverage = 10
+margin_mode = "isolated"
+max_portfolio_risk_percent = "3"
+max_daily_loss_percent = "1"
+minimum_free_margin = "50"
+minimum_free_margin_percent = "10"
+poll_seconds = 15
